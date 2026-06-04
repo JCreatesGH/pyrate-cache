@@ -18,7 +18,7 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/josh/pyrate-cache"
+Homepage = "https://github.com/JCreatesGH/pyrate-cache"
 
 [tool.setuptools.packages.find]
 where = ["src"]
