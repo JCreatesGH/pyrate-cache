@@ -1,5 +1,6 @@
 """Token-bucket rate limiting decorator."""
 from __future__ import annotations
+import asyncio
 import time
 import threading
 import functools
@@ -60,15 +61,28 @@ def rate_limit(calls: int, period: float = 1.0, block: bool = True) -> Callable:
     bucket = TokenBucket(rate=calls / period, capacity=calls)
 
     def decorator(func: Callable) -> Callable:
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def awrapper(*args: Any, **kwargs: Any) -> Any:
+                while not bucket.consume():
+                    wait = bucket.time_until()
+                    if not block:
+                        raise RateLimitExceeded(wait)
+                    await asyncio.sleep(wait)
+                return await func(*args, **kwargs)
+
+            awrapper.bucket = bucket  # type: ignore[attr-defined]
+            return awrapper
+
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            if bucket.consume():
-                return func(*args, **kwargs)
-            wait = bucket.time_until()
-            if not block:
-                raise RateLimitExceeded(wait)
-            time.sleep(wait)
-            bucket.consume()
+            # Loop rather than consume-once-after-sleep: under contention another
+            # caller may grab the refilled token first.
+            while not bucket.consume():
+                wait = bucket.time_until()
+                if not block:
+                    raise RateLimitExceeded(wait)
+                time.sleep(wait)
             return func(*args, **kwargs)
 
         wrapper.bucket = bucket  # type: ignore[attr-defined]

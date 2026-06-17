@@ -1,3 +1,4 @@
+import asyncio
 import time
 import pytest
 from pyrate_cache import rate_limit, RateLimitExceeded, TokenBucket
@@ -41,3 +42,31 @@ def test_blocking_waits():
 def test_invalid_params():
     with pytest.raises(ValueError):
         TokenBucket(rate=0, capacity=1)
+
+
+def test_async_non_blocking_raises():
+    @rate_limit(calls=1, period=10, block=False)
+    async def f():
+        return "ok"
+
+    async def run():
+        first = await f()
+        with pytest.raises(RateLimitExceeded):
+            await f()
+        return first
+
+    assert asyncio.run(run()) == "ok"
+
+
+def test_async_blocking_waits():
+    @rate_limit(calls=2, period=0.1, block=True)
+    async def f():
+        return time.monotonic()
+
+    async def run():
+        await f(); await f()
+        start = time.monotonic()
+        await f()   # must await a refill
+        return time.monotonic() - start
+
+    assert asyncio.run(run()) > 0.01
