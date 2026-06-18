@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyrate-cache"
-version = "0.1.0"
-description = "Tiny dependency-free rate limiting and caching decorators for Python."
+version = "0.2.0"
+description = "Tiny dependency-free caching and rate-limiting (token-bucket + sliding-window, per-key) decorators for Python."
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }

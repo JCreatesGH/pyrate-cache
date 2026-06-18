@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Tiny, **zero-dependency** rate limiting and caching decorators for Python. Thread-safe and `async`-aware, with TTL + LRU caching, pluggable cache backends, and a proper token-bucket limiter.
+Tiny, **zero-dependency** rate limiting and caching decorators for Python. Thread-safe and `async`-aware, with TTL + LRU caching, pluggable cache backends, **token-bucket *and* sliding-window** limiters, and **per-key** (per-user / per-IP) limiting.
 
 ![screenshot](assets/screenshot.png)
 
@@ -31,6 +31,11 @@ def call_api(url):
 def webhook(payload):
     ...
 
+# strict sliding window (never more than N per window), limited *per user*:
+@rate_limit(calls=10, period=60, strategy="sliding-window", key=lambda req: req.user_id)
+def handle(req):
+    ...
+
 fib.cache_info()   # CacheInfo(hits=…, misses=…, maxsize=1000, currsize=…)
 ```
 
@@ -47,7 +52,7 @@ async def fetch(url):
 ### Why
 
 - **`@cache`** — TTL expiry, **LRU `maxsize`** bound, `.hits` / `.misses` and `.cache_info()`, `.cache_clear()`, correct caching of `None` results, and any object with `get/set/clear` works as a backend (swap in Redis in one line).
-- **`@rate_limit`** — real [token bucket](https://en.wikipedia.org/wiki/Token_bucket): smooth limiting, burst capacity, blocking *or* non-blocking (`RateLimitExceeded`).
+- **`@rate_limit`** — two strategies: [`token-bucket`](https://en.wikipedia.org/wiki/Token_bucket) (default; smooth, allows bursts up to `calls`) and `sliding-window` (strict; never more than `calls` per trailing window). Blocking *or* non-blocking (`RateLimitExceeded`), and an optional `key=` callable gives each user/tenant/IP its own independent budget. The `TokenBucket` and `SlidingWindowLimiter` classes are usable standalone too.
 
 ### Custom backend
 
@@ -66,7 +71,7 @@ def heavy(x): ...
 ## Development
 
 ```bash
-pip install -e .[dev] && python -m pytest -q     # 16 tests, runs in <1s
+pip install -e .[dev] && python -m pytest -q     # 21 tests, runs in <1s
 ```
 
 ## License
