@@ -113,3 +113,31 @@ def test_keyed_rate_limit_is_per_key():
     with pytest.raises(RateLimitExceeded):
         hit("alice")                       # alice's single token is spent
     assert len(hit.limiters) == 2
+
+
+def test_token_bucket_remaining():
+    b = TokenBucket(rate=10, capacity=5)
+    assert b.remaining() == 5
+    b.consume(); b.consume()
+    assert b.remaining() == 3
+    while b.consume():
+        pass
+    assert b.remaining() == 0
+
+
+def test_sliding_window_remaining():
+    w = SlidingWindowLimiter(limit=3, period=10)
+    assert w.remaining() == 3
+    w.consume(); w.consume()
+    assert w.remaining() == 1
+    w.consume()
+    assert w.remaining() == 0
+
+
+def test_remaining_via_decorator_handle():
+    @rate_limit(calls=4, period=60, block=False)
+    def f():
+        return "ok"
+    f(); f()
+    # the attached limiter is introspectable for X-RateLimit-Remaining headers
+    assert f.limiter.remaining() == 2

@@ -67,7 +67,8 @@ class MemoryCache:
 
 
 def cache(ttl: Optional[float] = None, maxsize: Optional[int] = None,
-          backend: Optional[CacheBackend] = None) -> Callable:
+          backend: Optional[CacheBackend] = None,
+          key: Optional[Callable[..., Any]] = None) -> Callable:
     """Cache a function's (or coroutine's) return value.
 
     Args:
@@ -75,13 +76,20 @@ def cache(ttl: Optional[float] = None, maxsize: Optional[int] = None,
         maxsize: max entries before least-recently-used eviction (default: unbounded).
             Ignored when an explicit ``backend`` is supplied.
         backend: any CacheBackend (defaults to a per-decorator MemoryCache).
+        key: optional ``key(*args, **kwargs)`` returning a hashable cache key — cache by a
+            subset of the arguments, or normalize them (e.g. ignore a `self`/session arg).
+            Defaults to keying on all positional + keyword arguments.
     """
     # NB: `backend or ...` would be wrong — an empty MemoryCache is falsy (it has __len__).
     store: CacheBackend = backend if backend is not None else MemoryCache(maxsize=maxsize)
 
     def decorator(func: Callable) -> Callable:
-        def lookup(key: str, holder: Callable):
-            hit = store.get(key)
+        def make_key(args: Tuple[Any, ...], kwargs: dict) -> str:
+            inner = repr(key(*args, **kwargs)) if key is not None else _make_key(args, kwargs)
+            return func.__qualname__ + ":" + inner
+
+        def lookup(key_: str, holder: Callable):
+            hit = store.get(key_)
             if hit is not None:
                 holder.hits += 1                        # type: ignore[attr-defined]
                 return True, (None if hit is _NULL else hit)
@@ -91,24 +99,24 @@ def cache(ttl: Optional[float] = None, maxsize: Optional[int] = None,
         if asyncio.iscoroutinefunction(func):
             @functools.wraps(func)
             async def awrapper(*args: Any, **kwargs: Any) -> Any:
-                key = func.__qualname__ + ":" + _make_key(args, kwargs)
-                found, value = lookup(key, awrapper)
+                k = make_key(args, kwargs)
+                found, value = lookup(k, awrapper)
                 if found:
                     return value
                 result = await func(*args, **kwargs)
-                store.set(key, _NULL if result is None else result, ttl)
+                store.set(k, _NULL if result is None else result, ttl)
                 return result
             _attach(awrapper, store, maxsize)
             return awrapper
 
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            key = func.__qualname__ + ":" + _make_key(args, kwargs)
-            found, value = lookup(key, wrapper)
+            k = make_key(args, kwargs)
+            found, value = lookup(k, wrapper)
             if found:
                 return value
             result = func(*args, **kwargs)
-            store.set(key, _NULL if result is None else result, ttl)
+            store.set(k, _NULL if result is None else result, ttl)
             return result
         _attach(wrapper, store, maxsize)
         return wrapper

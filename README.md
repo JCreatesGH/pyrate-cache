@@ -51,8 +51,8 @@ async def fetch(url):
 
 ### Why
 
-- **`@cache`** — TTL expiry, **LRU `maxsize`** bound, `.hits` / `.misses` and `.cache_info()`, `.cache_clear()`, correct caching of `None` results, and any object with `get/set/clear` works as a backend (swap in Redis in one line).
-- **`@rate_limit`** — two strategies: [`token-bucket`](https://en.wikipedia.org/wiki/Token_bucket) (default; smooth, allows bursts up to `calls`) and `sliding-window` (strict; never more than `calls` per trailing window). Blocking *or* non-blocking (`RateLimitExceeded`), and an optional `key=` callable gives each user/tenant/IP its own independent budget. The `TokenBucket` and `SlidingWindowLimiter` classes are usable standalone too.
+- **`@cache`** — TTL expiry, **LRU `maxsize`** bound, `.hits` / `.misses` and `.cache_info()`, `.cache_clear()`, correct caching of `None` results, an optional **`key=` callable** to cache by a subset of the args (or ignore a `self`/session arg), and any object with `get/set/clear` works as a backend (swap in Redis in one line).
+- **`@rate_limit`** — two strategies: [`token-bucket`](https://en.wikipedia.org/wiki/Token_bucket) (default; smooth, allows bursts up to `calls`) and `sliding-window` (strict; never more than `calls` per trailing window). Blocking *or* non-blocking (`RateLimitExceeded`, which carries `retry_after`), and an optional `key=` callable gives each user/tenant/IP its own independent budget. The `TokenBucket` and `SlidingWindowLimiter` classes are usable standalone too, each exposing **`remaining()`** and `time_until()` so you can emit `X-RateLimit-Remaining` / `Reset` headers.
 
 ### Custom backend
 
@@ -71,7 +71,7 @@ def heavy(x): ...
 ## Development
 
 ```bash
-pip install -e .[dev] && python -m pytest -q     # 21 tests, runs in <1s
+pip install -e .[dev] && python -m pytest -q     # 26 tests, runs in <1s
 ```
 
 ## License

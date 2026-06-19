@@ -116,3 +116,29 @@ def test_async_caching():
     assert a == 30 and b == 30
     assert calls == [3]           # awaited body ran once
     assert f.hits == 1 and f.misses == 1
+
+
+def test_cache_custom_key_ignores_unkeyed_args():
+    calls = []
+
+    @cache(key=lambda user_id, _session=None: user_id)
+    def load(user_id, _session=None):
+        calls.append((user_id, _session))
+        return {"id": user_id}
+
+    a = load(7, _session="s1")
+    b = load(7, _session="s2")     # different session, same key -> cache hit
+    assert a == b == {"id": 7}
+    assert calls == [(7, "s1")]    # body ran once; the session arg didn't change the key
+    assert load(8, _session="s1")  # different key -> miss
+    assert len(calls) == 2
+
+
+def test_cache_custom_key_distinguishes_distinct_keys():
+    @cache(key=lambda *a: a[0])
+    def f(x, y):
+        return x + y
+
+    assert f(1, 1) == 2
+    assert f(1, 99) == 2           # same key (x=1) -> returns the first cached result
+    assert f(2, 1) == 3            # different key

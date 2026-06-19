@@ -50,6 +50,12 @@ class TokenBucket:
                 return 0.0
             return (amount - self._tokens) / self.rate
 
+    def remaining(self) -> int:
+        """Whole calls available right now — for an ``X-RateLimit-Remaining`` header."""
+        with self._lock:
+            self._refill()
+            return int(self._tokens)
+
 
 class SlidingWindowLimiter:
     """Sliding-window-log limiter: at most `limit` calls in any trailing
@@ -86,6 +92,13 @@ class SlidingWindowLimiter:
                 return 0.0
             # a slot frees when the oldest hit leaves the trailing window
             return max(0.0, self._hits[0] + self.period - now)
+
+    def remaining(self) -> int:
+        """Calls still allowed in the current trailing window — for an
+        ``X-RateLimit-Remaining`` header."""
+        with self._lock:
+            self._evict(time.monotonic())
+            return max(0, self.limit - len(self._hits))
 
 
 def _make_limiter(strategy: str, calls: int, period: float):

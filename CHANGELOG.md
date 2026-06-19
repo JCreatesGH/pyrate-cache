@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.0]
+
+### Added
+- **`@cache(key=…)`** — an optional key callable to cache by a subset of the arguments (or
+  normalize them, e.g. ignore a `self`/session arg). Defaults to keying on all args as before.
+- **`TokenBucket.remaining()` / `SlidingWindowLimiter.remaining()`** — whole calls available
+  right now; with the existing `time_until()` this is everything you need to emit
+  `X-RateLimit-Remaining` / `X-RateLimit-Reset` headers from the decorator's attached limiter.
+
 ## [0.2.0]
 
 ### Added
